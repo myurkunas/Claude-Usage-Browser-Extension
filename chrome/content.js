@@ -7,7 +7,7 @@
   const panel = document.createElement("div");
   panel.id = PANEL_ID;
   panel.title = "Click to refresh";
-  panel.addEventListener("click", (e) => {
+  panel.addEventListener("pointerdown", (e) => {
     e.stopPropagation();
     load();
   });
@@ -76,15 +76,22 @@
   }).observe(document.body, { childList: true, subtree: true });
 
   async function getOrgs() {
-    const res = await fetch("/api/organizations", { credentials: "include" });
-    if (!res.ok) throw new Error(`organizations: HTTP ${res.status}`);
-    const orgs = await res.json();
-    if (!Array.isArray(orgs) || orgs.length === 0) throw new Error("no orgs found");
-    return orgs;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const res = await fetch("/api/organizations", { credentials: "include", cache: "no-store" });
+      if (res.ok) {
+        const orgs = await res.json();
+        if (!Array.isArray(orgs) || orgs.length === 0) throw new Error("no orgs found");
+        return orgs;
+      }
+      if (res.status !== 403 || attempt === 2) {
+        throw new Error(`organizations: HTTP ${res.status}`);
+      }
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    }
   }
 
   async function fetchUsage(orgId) {
-    const res = await fetch(`/api/organizations/${orgId}/usage`, { credentials: "include" });
+    const res = await fetch(`/api/organizations/${orgId}/usage`, { credentials: "include", cache: "no-store" });
     if (!res.ok) {
       const err = new Error(`usage: HTTP ${res.status}`);
       err.status = res.status;
